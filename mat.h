@@ -39,7 +39,7 @@ uint8_t* findPcx(noeRAPI_t* rapi, uint16_t& strcode, int& size) {
 }
 
 inline
-noesisTex_t* loadTexture(noeRAPI_t* rapi, uint16_t& strcode) {
+noesisTex_t* loadTexture(noeRAPI_t* rapi, uint16_t& strcode, noesisTex_t **alphaTexture) {
     int size;
     uint8_t* texData = findPcx(rapi, strcode, size);
     if (!texData) return NULL;
@@ -47,12 +47,34 @@ noesisTex_t* loadTexture(noeRAPI_t* rapi, uint16_t& strcode) {
     int width;
     int height;
     int components;
-    uint8_t* imageData = drpcx_load_memory(texData, size, false, &width, &height, &components, 4);
+
+    drpcx pcxResult{};
+    int loadResult = drpcx_load_memory(&pcxResult, texData, size, false, &width, &height, &components, 4);
+    if (loadResult <= 0 || pcxResult.loaded <= 0) {
+        char s[64];
+        sprintf(s, "Can't load image %04X", strcode);
+        MessageBoxA(NULL, s, "Error", 0);
+        return NULL;
+    }
+
+    uint8_t* imageData = pcxResult.pImageData;
+    uint8_t* paletteData = pcxResult.pPaletteIndices;
+
     int datasize = width * height * 4;
     uint8_t* tga = makeTGA(imageData, datasize, width, height);
+    uint8_t* alphaTga = makeTGAPalette(paletteData, datasize, width, height);
+    
     drpcx_free(imageData);
+    drpcx_free(paletteData);
+
     noesisTex_t* noeTexture = rapi->Noesis_LoadTexByHandler(tga, datasize + 0x12, ".tga");
+    noesisTex_t* noeTextureAlpha = rapi->Noesis_LoadTexByHandler(alphaTga, datasize + 0x12, ".tga");
+    if (alphaTexture != nullptr) {
+        *alphaTexture = noeTextureAlpha;
+    }
+
     delete[] tga;
+    delete[] alphaTga;
     delete[] texData;
     return noeTexture;
 }
@@ -77,11 +99,16 @@ void bindMat(uint16_t strcode, BYTE* fileBuffer, noeRAPI_t* rapi, CArrayList<noe
     //create material
     noesisMaterial_t* noeMat = rapi->Noesis_GetMaterialList(1, false);
     noeMat->name = rapi->Noesis_PooledString(matName);
+    noeMat->noLighting = true;
 
     //set tex name
     std::string texStr = intToHexString(strcode) + ".tga";
-    char texName[11];
+    std::string texStrA = intToHexString(strcode) + "_a.tga";
+
+    char texName[32];
+    char texNameAlpha[32];
     strcpy_s(texName, texStr.c_str());
+    strcpy_s(texNameAlpha, texStrA.c_str());
 
     //check if texture already exists
     int y = findTextureIdx(texName, texList);
@@ -95,15 +122,20 @@ void bindMat(uint16_t strcode, BYTE* fileBuffer, noeRAPI_t* rapi, CArrayList<noe
     }
 
     //load texture
-    noesisTex_t* noeTexture = loadTexture(rapi, strcode);
-    if (!noeTexture) return;
+    noesisTex_t* alphaMask = nullptr;
+    noesisTex_t* noeTexture = loadTexture(rapi, strcode, &alphaMask);
+    
+    if (!noeTexture || !alphaMask) return;
+
     noeTexture->filename = rapi->Noesis_PooledString(texName);
+    alphaMask->filename = rapi->Noesis_PooledString(texNameAlpha);
 
     //set tex to mat
     noeMat->texIdx = texList.Num();
     matList.Append(noeMat);
     
     texList.Append(noeTexture);
+    texList.Append(alphaMask);
 
     //set material
     rapi->rpgSetMaterial(noeMat->name);
