@@ -61,7 +61,7 @@ noesisTex_t* loadTexture(noeRAPI_t* rapi, uint16_t& strcode, noesisTex_t **alpha
     uint8_t* paletteData = pcxResult.pPaletteIndices;
 
     int datasize = width * height * 4;
-    uint8_t* tga = makeTGA(imageData, datasize, width, height);
+    uint8_t* tga = makeTGA(paletteData, imageData, datasize, width, height);
     uint8_t* alphaTga = makeTGAPalette(paletteData, datasize, width, height);
     
     drpcx_free(imageData);

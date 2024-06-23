@@ -5,6 +5,8 @@
 #include "mat.h"
 
 bool g_mgs1OarPrompt = false;
+bool g_mgs1OalphaLoad = false;
+
 const char* g_mgs1plugin_name = "Metal Gear Solid";
 
 inline
@@ -18,6 +20,10 @@ int mgs1_anim_prompt(int toolIdx, void* user_data) {
     return genericToolSet(g_mgs1OarPrompt, toolIdx);
 }
 
+int mgs1_alpha(int toolIdx, void* user_data) {
+    return genericToolSet(g_mgs1OalphaLoad, toolIdx);
+}
+
 inline
 int makeTool(char* toolDesc, int (*toolMethod)(int toolIdx, void* userData)) {
     int handle = g_nfn->NPAPI_RegisterTool(toolDesc, toolMethod, NULL);
@@ -28,4 +34,5 @@ int makeTool(char* toolDesc, int (*toolMethod)(int toolIdx, void* userData)) {
 inline
 void applyTools() {
     makeTool("Prompt for Motion Archive", mgs1_anim_prompt);
+    makeTool("Make alpha (experimental)", mgs1_alpha);
 }

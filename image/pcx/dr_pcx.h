@@ -832,7 +832,7 @@ uint8_t* makeTGAPalette(uint8_t* paletteIndex, int tgaDataSize, int16_t width, i
     return tga;
 }
 
-uint8_t* makeTGA(uint8_t* data, int dataSize, int16_t width, int16_t height) {
+uint8_t* makeTGA(uint8_t *palette, uint8_t* data, int dataSize, int16_t width, int16_t height) {
     uint32_t pad = 0;
     uint16_t twenty = 0x2020;
     uint32_t magic = 0x20000;
@@ -844,7 +844,29 @@ uint8_t* makeTGA(uint8_t* data, int dataSize, int16_t width, int16_t height) {
     memcpy(tga + 0x0C, &width, 2);
     memcpy(tga + 0x0E, &height, 2);
     memcpy(tga + 0x10, &twenty, 2);
-    memcpy(tga + 0x12, data, dataSize);
+
+    extern bool g_mgs1OalphaLoad;
+
+    uint8_t* tgaPixels = tga + 0x12;
+    uint32_t* tgaPixelsABGR = (uint32_t*)(tga + 0x12);
+    
+    if (!g_mgs1OalphaLoad) {
+        memcpy(tgaPixels, data, dataSize);
+    }
+    else {
+        memcpy(tgaPixels, data, dataSize);
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                auto pixIdx = x + y * width;
+
+                auto isBlack = tgaPixelsABGR[pixIdx] == 0xFF000000UL;
+                auto isFirstColor = palette[pixIdx] == 0;
+                auto alpha = (isBlack /* & isFirstColor*/) ? 0x00 : 0xFF;
+                tgaPixels[pixIdx * 4 + 3] = (uint8_t)alpha;
+            }
+        }
+    }
 
     return tga;
 }
